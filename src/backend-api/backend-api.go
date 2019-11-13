@@ -25,14 +25,24 @@ type ErrorMsg struct {
 	Code      uint32 `json:"code"`
 }
 
+// list of generic response codes / errors that may be returned after any HTTP request
+const (
+	RequestOK uint32 = 0 // request received was ok
+	BadJSON   uint32 = 1 // device provided bad JSON
+)
+
 // list of errors codes that may be returned when the device registers
 const (
-	AlreadyRegistered  uint32 = 1
-	MissingInformation uint32 = 2 // device did not provide all the necessary information when registering
-	BadJSON            uint32 = 3 // device provided bad JSON when registering
-	BadDeviceName      uint32 = 4 // device should not attempt to register with this name
-	BadDeviceMac       uint32 = 5 // device should not attempt to register with this MAC
-	TooManyDevices     uint32 = 6 // device should not attempt to register anymore
+	AlreadyRegistered  uint32 = 101
+	MissingInformation uint32 = 102 // device did not provide all the necessary information when registering
+	BadDeviceName      uint32 = 103 // device should not attempt to register with this name
+	BadDeviceMac       uint32 = 104 // device should not attempt to register with this MAC
+	TooManyDevices     uint32 = 105 // device should not attempt to register anymore
+)
+
+// list of errors codes that may be returned when the device registers
+const (
+	BadKey uint32 = 1
 )
 
 var deviceList []Device
@@ -41,6 +51,7 @@ func main() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/register", registerDevice).Methods("POST")
+	router.HandleFunc("/checkin", checkInDevice).Methods("POST")
 
 	http.ListenAndServe(":8000", router)
 }
@@ -54,11 +65,12 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	// check whether the request body has proper JSON and has all the information required
 	tmpDev, code := readRegisterRequestBody(r.Body)
-	if code != 0 {
+
+	if code != RequestOK {
 		var response string
-		if code == 2 {
+		if code == MissingInformation {
 			response, _ = generateErrorResponse("Information missing", MissingInformation)
-		} else if code == 3 {
+		} else if code == BadJSON {
 			response, _ = generateErrorResponse("Bad JSON", BadJSON)
 		}
 
@@ -73,7 +85,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		log.Println(deviceList[index].Name + " (" + deviceList[index].Mac + ")" + " attempted to register again")
 		response, _ := generateErrorResponse("Device already registered", AlreadyRegistered)
 		http.Error(w, response, http.StatusBadRequest)
-
 	} else {
 		// generate a key for this device
 		// TODO: this is not very secure yet, it just takes the MD5 hash of the MAC + Name
@@ -86,35 +97,57 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	debug_dumpDeviceList(deviceList)
+	debug_dumpDeviceList(deviceList) // just for DEBUG
+}
+
+func checkInDevice(w http.ResponseWriter, r *http.Request) {
+	// check-in endpoint for device
+	// device has to provide its key as an authentication mechanism
+	w.Header().Set("Content-Type", "application/json")
+	// tmpDev, code := readRegisterRequestBody(r.Body)
 
 }
 
 /////////////
 // helpful functions for API calls
 func readRegisterRequestBody(body io.ReadCloser) (Device, uint32) {
-	// check if the HTTP request has all the necessary parameters
-	// return an error if it is
+	// check if the HTTP request body received from registerDevice has all the necessary parameters
+	// return an error if either JSON is bad or if MAC / name of device is missing
 	var tmpDev Device
 	var err error
 	err = json.NewDecoder(body).Decode(&tmpDev)
 	if err == nil {
 		// request not malformed, check if all the necessary parameters are there
 		if tmpDev.Name == "" {
-			return tmpDev, 2
+			return tmpDev, MissingInformation
 		}
 
 		if tmpDev.Mac == "" {
 			err = fmt.Errorf("Missing device MAC")
-			return tmpDev, 2
+			return tmpDev, MissingInformation
 		}
 	} else {
 		// request malformed
-		return tmpDev, 3
+		return tmpDev, BadJSON
 	}
 
-	return tmpDev, 0
+	return tmpDev, RequestOK
 }
+
+// func readCheckinRequestBody(body io.ReadCloser) (Device, uint32) {
+//
+//
+// 	var tmpDev Device
+// 	var err error
+// 	err = json.NewDecoder(body).Decode(&tmpDev)
+// 	if err == nil {
+//
+// 	} else {
+// 		// request malformed
+// 		return tmpDev,
+// 	}
+//
+// }
 
 func generateErrorResponse(msg string, code uint32) (string, error) {
 	// generate a proper response message in JSON format
