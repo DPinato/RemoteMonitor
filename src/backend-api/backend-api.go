@@ -27,6 +27,10 @@ type ErrorMsg struct {
 	Code      uint32 `json:"code"`
 }
 
+type CustomJSONObj struct {
+	Key string `json:""`
+}
+
 // list of generic response codes / errors that may be returned after any HTTP request
 const (
 	RequestOK uint32 = 0 // request received was ok
@@ -115,7 +119,7 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 	tmpDev, code := readCheckinRequestBody(r.Body)
 
 	if code != CheckinOK {
-		var response string
+		var response string // response string to send to the device in case of an error
 		if code == BadKey {
 			response, _ = generateErrorResponse("Unknown key", BadKey)
 		} else if code == MalformedCheckin {
@@ -125,13 +129,15 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received bad checkin (error %d), %s\n", code, response)
 		http.Error(w, response, http.StatusBadRequest)
 		return
-
 	}
 
-	// update last check-in status of the device and reply back
+	// update last check-in status of the device
+	// reply back with the last time the device checked in as a confirmation, i.e. now
 	log.Printf("Received checkin from %s\n", tmpDev.Name)
 	tmpDev.LastCheckin = time.Now()
-	w.WriteHeader(http.StatusNoContent)
+	data := make(map[string]string)
+	data["last_checkin"] = tmpDev.LastCheckin.String()
+	json.NewEncoder(w).Encode(data)
 
 	debug_dumpDeviceList(deviceList) // just for DEBUG
 
