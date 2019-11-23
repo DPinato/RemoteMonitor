@@ -69,3 +69,22 @@ func Test_ReadRegisterRequestBody(t *testing.T) {
 	})
 
 }
+
+func Test_BytesToString(t *testing.T) {
+	assertCorrect := func(t *testing.T, got, want string) {
+		if got != want {
+			t.Errorf("Got %v, want %v", got, want)
+		}
+	}
+
+	t.Run("Proper [32]byte as an input", func(t *testing.T) {
+		var sample = [32]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+		got := BytesToString(sample)
+		want := "0001020304050607000102030405060700010203040506070001020304050607"
+		assertCorrect(t, got, want)
+	})
+
+}
