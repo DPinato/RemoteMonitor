@@ -23,8 +23,8 @@ type Device struct {
 }
 
 type ErrorMsg struct {
-	MsgString string `json:"error"`
 	Code      uint32 `json:"code"`
+	MsgString string `json:"error"`
 }
 
 type CustomJSONObj struct {
@@ -70,6 +70,7 @@ func main() {
 func registerDevice(w http.ResponseWriter, r *http.Request) {
 	// allows a device to register with this API
 	// the device provides a name, a key is provided to the device which must be used for any other call
+	var responseMap = make(map[string]interface{}) // map used to reply to client
 	log.Println("New device registration attempt from " + r.Host)
 	w.Header().Set("Content-Type", "application/json")
 
@@ -104,7 +105,12 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		// add it to the list and send a response back with the key
 		log.Printf("Registered new device, %s (%s)\n", tmpDev.Name, tmpDev.Mac)
 		deviceList = append(deviceList, tmpDev)
-		json.NewEncoder(w).Encode(&tmpDev)
+
+		// build response to send
+		responseMap["code"] = RegisterOK
+		responseMap["key"] = tmpDev.Key
+		responseMap["mac"] = tmpDev.Mac
+		json.NewEncoder(w).Encode(responseMap)
 
 	}
 
@@ -114,6 +120,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 func checkInDevice(w http.ResponseWriter, r *http.Request) {
 	// check-in endpoint for device, replies with 204 code if successful check-in
 	// device has to be already registered and provide its key, for the check-in to be considered valid
+	var responseMap = make(map[string]interface{}) // map used to reply to client
 	log.Println("New check-in attempt from " + r.Host)
 	var tmpDev *Device // reference to device checking in
 	tmpDev, code := readCheckinRequestBody(r.Body)
@@ -135,9 +142,11 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 	// reply back with the last time the device checked in as a confirmation, i.e. now
 	log.Printf("Received checkin from %s\n", tmpDev.Name)
 	tmpDev.LastCheckin = time.Now()
-	data := make(map[string]string)
-	data["last_checkin"] = tmpDev.LastCheckin.String()
-	json.NewEncoder(w).Encode(data)
+
+	// build response to send
+	responseMap["code"] = CheckinOK
+	responseMap["last_checkin"] = tmpDev.LastCheckin.String()
+	json.NewEncoder(w).Encode(responseMap)
 
 	debug_dumpDeviceList(deviceList) // just for DEBUG
 
