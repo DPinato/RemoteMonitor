@@ -140,7 +140,7 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 
 	// update last check-in status of the device
 	// reply back with the last time the device checked in as a confirmation, i.e. now
-	log.Printf("Received checkin from %s\n", tmpDev.Name)
+	log.Printf("Received valid checkin from %s\n", tmpDev.Name)
 	tmpDev.LastCheckin = time.Now()
 
 	// build response to send
