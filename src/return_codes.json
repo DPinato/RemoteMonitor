@@ -1,0 +1,18 @@
+[
+	{"code_string": "RegisterOK", "code": 100, "comment": "Device registered successfully"},
+	{"code_string": "AlreadyRegistered", "code": 101, "comment": "Device is already registered"},
+	{"code_string": "MissingInformation", "code": 102, "comment": "Device did not provide all the necessary information when registering"},
+	{"code_string": "BadDeviceName", "code": 103, "comment": "Device should not attempt to register with this name"},
+	{"code_string": "BadDeviceMac", "code": 104, "comment": "Device should not attempt to register with this MAC"},
+	{"code_string": "TooManyDevices", "code": 105, "comment": "Device should not attempt to register anymore"},
+
+	{"code_string": "CheckinOK", "code": 200, "comment": "Check in was ok"},
+	{"code_string": "MalformedCheckin", "code": 201, "comment": "Device provided malformed JSON body"},
+
+	{"code_string": "DataOK", "code": 300, "comment": "Data received from the device was ok"},
+	{"code_string": "BadKey", "code": 301, "comment": "Device provided non-recognised key"},
+	{"code_string": "DataMalformed", "code": 302, "comment": "Device provided data with either malformed JSON or in an unexpected format"},
+	{"code_string": "DataTimestampBad", "code": 303, "comment": "Device provided data with an unexpected timestamp"},
+	{"code_string": "Wait", "code": 304, "comment": "Instruct node-reporter to wait before sending anymore data"},
+	{"code_string": "WaitAndResend", "code": 305, "comment": "Instruct node-reporter to wait before re-sending the data just sent"}
+]
