@@ -24,7 +24,7 @@ type Device struct {
 var myInfo Device // information device uses to identify itself
 
 func main() {
-	serverURL := "http://localhost:8000"
+	serverURL := "http://localhost:80"
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
@@ -142,6 +142,11 @@ func processRegisterResponse(resp *http.Response) error {
 	err = json.Unmarshal([]byte(body), &respMap)
 
 	// check the code received in the response
+	if respMap["code"] == nil {
+		// response from backend does not contain a code
+		return fmt.Errorf("processRegisterResponse did not receive a code\n")
+	}
+
 	code := int(respMap["code"].(float64))
 	if code == 100 {
 		myInfo.Key = respMap["key"].(string)
