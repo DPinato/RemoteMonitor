@@ -10,13 +10,12 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
+// Device is for maintaining devices currently being handled by this backend process
 type Device struct {
 	Name        string    `json:"name"`         // name a device identified itself with
 	Key         string    `json:"key"`          // key the device will use to authenticate itself with backend-api
@@ -24,50 +23,25 @@ type Device struct {
 	LastCheckin time.Time `json:"last_checkin"` // time when the device last checked in
 }
 
-type ErrorMsg struct {
-	Code      uint32 `json:"code"`
-	MsgString string `json:"error"`
+// ReturnCode is for responses to devices
+type ReturnCode struct {
+	Code       int    `json:"code"`
+	CodeString string `json:"code_string"`
+	Comment    string `json:"comment"`
 }
-
-type CustomJSONObj struct {
-	Key string `json:""`
-}
-
-// list of generic response codes / errors that may be returned after any HTTP request
-const (
-	RequestOK uint32 = 0 // request received was ok
-	BadJSON   uint32 = 1 // device provided bad JSON
-)
-
-// list of errors codes that may be returned when the device registers
-const (
-	RegisterOK         uint32 = 100
-	AlreadyRegistered  uint32 = 101
-	MissingInformation uint32 = 102 // device did not provide all the necessary information when registering
-	BadDeviceName      uint32 = 103 // device should not attempt to register with this name
-	BadDeviceMac       uint32 = 104 // device should not attempt to register with this MAC
-	TooManyDevices     uint32 = 105 // device should not attempt to register anymore
-)
-
-// list of codes that may be returned when the device checks in
-const (
-	CheckinOK        uint32 = 200
-	BadKey           uint32 = 201 // device provided unknown key
-	MalformedCheckin uint32 = 202 // device provided malformed JSON body
-)
 
 var deviceList []Device                  // cache for list of current devices
-var returnCodes []map[string]interface{} // store codes to return to clients
+var returnCodeList map[string]ReturnCode // store codes to return to clients
 var codeListLocation = "../return_codes.json"
 
 func main() {
 
 	// import return codes from JSON file
+	returnCodeList = make(map[string]ReturnCode)
 	err := importReturnCodes(codeListLocation)
 	if err != nil {
 		log.Panicln(err)
 	}
-	os.Exit(1)
 
 	// start HTTP server
 	router := mux.NewRouter()
@@ -89,12 +63,24 @@ func importReturnCodes(fileLoc string) error {
 	}
 
 	// convert bytes read to JSON map
-	err = json.Unmarshal(byteData, &returnCodes)
+	var tmpCodeMap []map[string]interface{}
+	err = json.Unmarshal(byteData, &tmpCodeMap)
 	if err != nil {
 		return err
 	}
-	log.Printf("Imported %d return codes\n", len(returnCodes))
-	log.Println(returnCodes)
+	log.Printf("Imported %d return codes\n", len(tmpCodeMap))
+	log.Println(tmpCodeMap)
+
+	// store it in returnCodeList, the key will be the code
+	for _, element := range tmpCodeMap {
+		var tmpCode ReturnCode
+		tmpCode.Code = int(element["code"].(float64))
+		tmpCode.CodeString = element["code_string"].(string)
+		tmpCode.Comment = element["comment"].(string)
+		returnCodeList[tmpCode.CodeString] = tmpCode
+	}
+	log.Printf("Processed %d return codes\n", len(returnCodeList))
+	log.Println(returnCodeList)
 
 	return nil
 }
@@ -104,19 +90,18 @@ func importReturnCodes(fileLoc string) error {
 func registerDevice(w http.ResponseWriter, r *http.Request) {
 	// allows a device to register with this API
 	// the device provides a name, a key is provided to the device which must be used for any other call
-	var responseMap = make(map[string]interface{}) // map used to reply to client
 	log.Println("New device registration attempt from " + r.Host)
 	w.Header().Set("Content-Type", "application/json")
 
 	// check whether the request body has proper JSON and has all the information required
 	tmpDev, code := readRegisterRequestBody(r.Body)
 
-	if code != RequestOK {
+	if code != returnCodeList["RequestOK"].Code {
 		var response string
-		if code == MissingInformation {
-			response, _ = generateErrorResponse("Information missing", MissingInformation)
-		} else if code == BadJSON {
-			response, _ = generateErrorResponse("Bad JSON", BadJSON)
+		if code == returnCodeList["MissingInformation"].Code {
+			response, _ = generateErrorResponse("MissingInformation")
+		} else if code == returnCodeList["BadJSON"].Code {
+			response, _ = generateErrorResponse("BadJSON")
 		}
 
 		log.Printf("Received bad or incomplete request (error %d), %s\n", code, response)
@@ -128,7 +113,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	index := findDeviceByMac(deviceList, tmpDev)
 	if index != -1 {
 		log.Println(deviceList[index].Name + " (" + deviceList[index].Mac + ")" + " attempted to register again")
-		response, _ := generateErrorResponse("Device already registered", AlreadyRegistered)
+		response, _ := generateErrorResponse("AlreadyRegistered")
 		http.Error(w, response, http.StatusBadRequest)
 	} else {
 		// generate a key for this device
@@ -141,10 +126,17 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		deviceList = append(deviceList, tmpDev)
 
 		// build response to send
-		responseMap["code"] = RegisterOK
-		responseMap["key"] = tmpDev.Key
-		responseMap["mac"] = tmpDev.Mac
-		json.NewEncoder(w).Encode(responseMap)
+		resp, err := generateRegisterResponse(tmpDev)
+		if err != nil {
+			log.Println(err)
+		}
+
+		// err := json.NewEncoder(w).Encode(responseMap)
+		w.WriteHeader(200)
+		_, err = w.Write([]byte(resp))
+		if err != nil {
+			log.Println(err)
+		}
 
 	}
 
@@ -159,12 +151,12 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 	var tmpDev *Device // reference to device checking in
 	tmpDev, code := readCheckinRequestBody(r.Body)
 
-	if code != CheckinOK {
+	if code != returnCodeList["CheckinOK"].Code {
 		var response string // response string to send to the device in case of an error
-		if code == BadKey {
-			response, _ = generateErrorResponse("Unknown key", BadKey)
-		} else if code == MalformedCheckin {
-			response, _ = generateErrorResponse("Could not process body", MalformedCheckin)
+		if code == returnCodeList["BadKey"].Code {
+			response, _ = generateErrorResponse("BadKey")
+		} else if code == returnCodeList["MalformedCheckin"].Code {
+			response, _ = generateErrorResponse("MalformedCheckin")
 		}
 
 		log.Printf("Received bad checkin (error %d), %s\n", code, response)
@@ -178,7 +170,7 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 	tmpDev.LastCheckin = time.Now()
 
 	// build response to send
-	responseMap["code"] = CheckinOK
+	responseMap["code"] = returnCodeList["CheckinOK"].Code
 	responseMap["last_checkin"] = tmpDev.LastCheckin.String()
 	json.NewEncoder(w).Encode(responseMap)
 
@@ -188,7 +180,7 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 
 /////////////
 // helpful functions for API calls
-func readRegisterRequestBody(body io.ReadCloser) (Device, uint32) {
+func readRegisterRequestBody(body io.ReadCloser) (Device, int) {
 	// check if the HTTP request body received from registerDevice has all the necessary parameters
 	// return an error if either JSON is bad or if MAC / name of device is missing
 	var tmpDev Device
@@ -197,22 +189,22 @@ func readRegisterRequestBody(body io.ReadCloser) (Device, uint32) {
 	if err == nil {
 		// request not malformed, check if all the necessary parameters are there
 		if tmpDev.Name == "" {
-			return tmpDev, MissingInformation
+			return tmpDev, returnCodeList["MissingInformation"].Code
 		}
 
 		if tmpDev.Mac == "" {
 			err = fmt.Errorf("Missing device MAC")
-			return tmpDev, MissingInformation
+			return tmpDev, returnCodeList["MissingInformation"].Code
 		}
 	} else {
 		// request malformed
-		return tmpDev, BadJSON
+		return tmpDev, returnCodeList["BadJSON"].Code
 	}
 
-	return tmpDev, RequestOK
+	return tmpDev, returnCodeList["RequestOK"].Code
 }
 
-func readCheckinRequestBody(body io.ReadCloser) (*Device, uint32) {
+func readCheckinRequestBody(body io.ReadCloser) (*Device, int) {
 	// check if a check-in request body is valid
 	// if valid, return a reference to the device performing the check-in
 	var tmpDev *Device
@@ -223,35 +215,50 @@ func readCheckinRequestBody(body io.ReadCloser) (*Device, uint32) {
 		index := findDeviceByKey(deviceList, *tmpDev)
 		if index == -1 {
 			// not found
-			return nil, BadKey
+			return nil, returnCodeList["BadKey"].Code
 		} else {
 			tmpDev = &deviceList[index]
 		}
 
 	} else {
 		// request malformed
-		return nil, MalformedCheckin
+		return nil, returnCodeList["MalformedCheckin"].Code
 	}
 
-	return tmpDev, CheckinOK
+	return tmpDev, returnCodeList["CheckinOK"].Code
 
 }
 
-func generateErrorResponse(msg string, code uint32) (string, error) {
-	// generate a proper response message in JSON format
-	var tmpError ErrorMsg
-	tmpError.MsgString = msg
-	tmpError.Code = code
+func generateRegisterResponse(dev Device) (string, error) {
+	// generate a proper response message to return to a device after receiving a successful register request
+	var responseMap = make(map[string]interface{}) // map used to reply to client
+	responseMap["code"] = returnCodeList["RegisterOK"].Code
+	responseMap["comment"] = returnCodeList["RegisterOK"].Comment
+	responseMap["code_string"] = returnCodeList["RegisterOK"].CodeString
+	responseMap["key"] = dev.Key
+	responseMap["mac"] = dev.Mac
 
-	jsonData, err := json.Marshal(tmpError)
+	jsonData, err := json.Marshal(responseMap)
 	if err != nil {
-		log.Println("generateErrorResponse failed to marshal JSON")
-		log.Println("msg: " + msg)
-		log.Println("code: " + strconv.Itoa(int(code)))
-		return "", nil
+		log.Println("generateRegisterResponse failed to marshal JSON")
+		return "", err
 	}
 
-	return string(jsonData), err
+	return string(jsonData), nil
+
+}
+
+func generateErrorResponse(codeStr string) (string, error) {
+	// generate a proper error response message in JSON format
+	jsonData, err := json.Marshal(returnCodeList[codeStr])
+	if err != nil {
+		log.Println("generateErrorResponse failed to marshal JSON")
+		log.Println(returnCodeList[codeStr].Comment)
+		log.Printf("code: %d\n", returnCodeList[codeStr].Code)
+		return "", err
+	}
+
+	return string(jsonData), nil
 }
 
 /////////////

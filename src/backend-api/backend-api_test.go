@@ -10,7 +10,7 @@ import (
 )
 
 func Test_ReadRegisterRequestBody(t *testing.T) {
-	assertCorrect := func(t *testing.T, got, want uint32) {
+	assertCorrect := func(t *testing.T, got, want int) {
 		if got != want {
 			t.Errorf("Got %v, want %v", got, want)
 		}
@@ -23,7 +23,7 @@ func Test_ReadRegisterRequestBody(t *testing.T) {
 		byteData, _ := json.Marshal(testDev)
 		r := ioutil.NopCloser(bytes.NewReader(byteData))
 		_, got := readRegisterRequestBody(r)
-		want := RequestOK
+		want := returnCodeList["RequestOK"].Code
 		assertCorrect(t, got, want)
 	})
 
@@ -34,7 +34,7 @@ func Test_ReadRegisterRequestBody(t *testing.T) {
 		byteData, _ := json.Marshal(testDev)
 		r := ioutil.NopCloser(bytes.NewReader(byteData))
 		_, got := readRegisterRequestBody(r)
-		want := MissingInformation
+		want := returnCodeList["MissingInformation"].Code
 		assertCorrect(t, got, want)
 	})
 
@@ -45,7 +45,7 @@ func Test_ReadRegisterRequestBody(t *testing.T) {
 		byteData, _ := json.Marshal(testDev)
 		r := ioutil.NopCloser(bytes.NewReader(byteData))
 		_, got := readRegisterRequestBody(r)
-		want := MissingInformation
+		want := returnCodeList["MissingInformation"].Code
 		assertCorrect(t, got, want)
 	})
 
@@ -53,7 +53,7 @@ func Test_ReadRegisterRequestBody(t *testing.T) {
 		testJson := "{\"name\":\"Sample name\", \"mac\":\"00:00:00:00:00:00}"
 		r := ioutil.NopCloser(bytes.NewReader([]byte(testJson)))
 		_, got := readRegisterRequestBody(r)
-		want := BadJSON
+		want := returnCodeList["BadJSON"].Code
 		assertCorrect(t, got, want)
 	})
 
@@ -64,7 +64,7 @@ func Test_ReadRegisterRequestBody(t *testing.T) {
 		byteData, _ := json.Marshal(testDev)
 		r := ioutil.NopCloser(bytes.NewReader(byteData))
 		_, got := readRegisterRequestBody(r)
-		want := BadDeviceMac
+		want := returnCodeList["BadDeviceMac"].Code
 		assertCorrect(t, got, want)
 	})
 
