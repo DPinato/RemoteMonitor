@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -54,15 +56,47 @@ const (
 	MalformedCheckin uint32 = 202 // device provided malformed JSON body
 )
 
-var deviceList []Device
+var deviceList []Device                  // cache for list of current devices
+var returnCodes []map[string]interface{} // store codes to return to clients
+var codeListLocation = "../return_codes.json"
 
 func main() {
+
+	// import return codes from JSON file
+	err := importReturnCodes(codeListLocation)
+	if err != nil {
+		log.Panicln(err)
+	}
+	os.Exit(1)
+
+	// start HTTP server
 	router := mux.NewRouter()
 
 	router.HandleFunc("/register", registerDevice).Methods("POST")
 	router.HandleFunc("/checkin", checkInDevice).Methods("POST")
 
 	http.ListenAndServe(":8000", router)
+}
+
+func importReturnCodes(fileLoc string) error {
+	// read return codes from fileLoc JSON file, they are used as follows:
+	// 1xxx codes are returned during device registration
+	// 2xxx codes are returned during device check in / out
+	// 3xxx codes are returned when data is being received from the device
+	byteData, err := ioutil.ReadFile(fileLoc)
+	if err != nil {
+		return err
+	}
+
+	// convert bytes read to JSON map
+	err = json.Unmarshal(byteData, &returnCodes)
+	if err != nil {
+		return err
+	}
+	log.Printf("Imported %d return codes\n", len(returnCodes))
+	log.Println(returnCodes)
+
+	return nil
 }
 
 ////////////

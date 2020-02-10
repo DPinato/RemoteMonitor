@@ -1,18 +1,20 @@
 [
-	{"code_string": "RegisterOK", "code": 100, "comment": "Device registered successfully"},
-	{"code_string": "AlreadyRegistered", "code": 101, "comment": "Device is already registered"},
-	{"code_string": "MissingInformation", "code": 102, "comment": "Device did not provide all the necessary information when registering"},
-	{"code_string": "BadDeviceName", "code": 103, "comment": "Device should not attempt to register with this name"},
-	{"code_string": "BadDeviceMac", "code": 104, "comment": "Device should not attempt to register with this MAC"},
-	{"code_string": "TooManyDevices", "code": 105, "comment": "Device should not attempt to register anymore"},
+	{"code": 1000, "code_string": "RegisterOK", "comment": "Registration successful"},
+	{"code": 1001, "code_string": "AlreadyRegistered", "comment": "Already registered"},
+	{"code": 1002, "code_string": "MissingInformation", "comment": "Registration missing information"},
+	{"code": 1003, "code_string": "BadDeviceName", "comment": "Bad name"},
+	{"code": 1004, "code_string": "BadDeviceMac", "comment": "Bad MAC address"},
+	{"code": 1005, "code_string": "TooManyDevices", "comment": "Stop registering"},
 
-	{"code_string": "CheckinOK", "code": 200, "comment": "Check in was ok"},
-	{"code_string": "MalformedCheckin", "code": 201, "comment": "Device provided malformed JSON body"},
+	{"code": 2000, "code_string": "CheckinOK", "comment": "Check in OK"},
+	{"code": 2001, "code_string": "MalformedCheckin", "comment": "Received malformed check in JSON"},
+	{"code": 2002, "code_string": "CheckoutOK", "comment": "Check out was ok"},
+	{"code": 2003, "code_string": "MalformedCheckout", "comment": "Received malformed check out JSON"},
 
-	{"code_string": "DataOK", "code": 300, "comment": "Data received from the device was ok"},
-	{"code_string": "BadKey", "code": 301, "comment": "Device provided non-recognised key"},
-	{"code_string": "DataMalformed", "code": 302, "comment": "Device provided data with either malformed JSON or in an unexpected format"},
-	{"code_string": "DataTimestampBad", "code": 303, "comment": "Device provided data with an unexpected timestamp"},
-	{"code_string": "Wait", "code": 304, "comment": "Instruct node-reporter to wait before sending anymore data"},
-	{"code_string": "WaitAndResend", "code": 305, "comment": "Instruct node-reporter to wait before re-sending the data just sent"}
+	{"code": 3000, "code_string": "DataOK", "comment": "Data ok"},
+	{"code": 3001, "code_string": "BadKey", "comment": "Bad authentication key"},
+	{"code": 3002, "code_string": "DataMalformed", "comment": "Data contains either malformed JSON or it uses an unexpected format"},
+	{"code": 3003, "code_string": "DataTimestampBad", "comment": "Data contains unexpected timestamp"},
+	{"code": 3004, "code_string": "Wait", "comment": "Wait before sending any more data"},
+	{"code": 3005, "code_string": "WaitAndResend", "comment": "Wait before resending this data"}
 ]
