@@ -12,6 +12,7 @@ type Device struct {
 	Key         string    `json:"key"`          // key the device will use to authenticate itself with backend-api
 	Mac         string    `json:"mac"`          // MAC address of any interface provided by the device
 	LastCheckin time.Time `json:"last_checkin"` // time when the device last checked in
+	OS          string    `json:"os"`           // operating system running on the device
 }
 
 func FindDeviceByMac(list []Device, dev Device) int {
