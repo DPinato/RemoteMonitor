@@ -4,15 +4,27 @@ package backendapi
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
+)
+
+// variables to connect to postgresql database
+const (
+	pgresHost      = "10.21.0.2"
+	pgresPort      = 5432
+	pgresUser      = "postgres"
+	pgresPass      = "qUA2d22b"
+	pgresDBName    = "rm_test"
+	pgresTableName = "reg_devices"
 )
 
 // ReturnCode is for responses to devices
@@ -24,16 +36,40 @@ type ReturnCode struct {
 
 var deviceList []Device                  // cache for list of current devices
 var returnCodeList map[string]ReturnCode // store codes to return to clients
-var codeListLocation = "../../return_codes.json"
+var codeListLocation = "../return_codes.json"
+var postgresCredFile = "postgres.json"
 
 func SetupBackend() {
+	var err error
 
 	// import return codes from JSON file
-	err := importReturnCodes(codeListLocation)
+	err = importReturnCodes(codeListLocation)
 	if err != nil {
 		log.Panicln(err)
 	}
 	log.Printf("Loaded %d return codes\n", len(returnCodeList))
+
+	// get postgres credentials from file
+	pCreds, err := readPostgresCredentialsFromFile(postgresCredFile)
+	if err != nil {
+		log.Printf("Failed to read Postgres credentials from %s\n", postgresCredFile)
+		log.Panic(err)
+	}
+
+	// connect to postgres
+	var dbObj *sql.DB
+	dbObj, err = connectToPostgres(pCreds["host"].(string),
+		pCreds["user"].(string),
+		pCreds["password"].(string),
+		pCreds["database"].(string),
+		int(pCreds["port"].(float64)))
+	if err != nil {
+		log.Panic(err)
+	}
+	defer dbObj.Close()
+	log.Printf("Successfully connected to Postgres at %s:%d\n", pgresHost, pgresPort)
+	log.Printf("Using database %s, table %s\n", pgresDBName, pgresTableName)
+	os.Exit(1)
 
 	// start HTTP server
 	router := mux.NewRouter()
