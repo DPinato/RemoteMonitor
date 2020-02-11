@@ -24,16 +24,16 @@ type ReturnCode struct {
 
 var deviceList []Device                  // cache for list of current devices
 var returnCodeList map[string]ReturnCode // store codes to return to clients
-var codeListLocation = "../return_codes.json"
+var codeListLocation = "../../return_codes.json"
 
 func SetupBackend() {
 
 	// import return codes from JSON file
-	returnCodeList = make(map[string]ReturnCode)
 	err := importReturnCodes(codeListLocation)
 	if err != nil {
 		log.Panicln(err)
 	}
+	log.Printf("Loaded %d return codes\n", len(returnCodeList))
 
 	// start HTTP server
 	router := mux.NewRouter()
@@ -49,6 +49,8 @@ func importReturnCodes(fileLoc string) error {
 	// 1xxx codes are returned during device registration
 	// 2xxx codes are returned during device check in / out
 	// 3xxx codes are returned when data is being received from the device
+	returnCodeList = make(map[string]ReturnCode)
+
 	byteData, err := ioutil.ReadFile(fileLoc)
 	if err != nil {
 		return err
@@ -60,8 +62,6 @@ func importReturnCodes(fileLoc string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Imported %d return codes\n", len(tmpCodeMap))
-	log.Println(tmpCodeMap)
 
 	// store it in returnCodeList, the key will be the code
 	for _, element := range tmpCodeMap {
@@ -71,8 +71,6 @@ func importReturnCodes(fileLoc string) error {
 		tmpCode.Comment = element["comment"].(string)
 		returnCodeList[tmpCode.CodeString] = tmpCode
 	}
-	log.Printf("Processed %d return codes\n", len(returnCodeList))
-	log.Println(returnCodeList)
 
 	return nil
 }
