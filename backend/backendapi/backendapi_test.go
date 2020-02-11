@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+var sampleCodeListLocation = "../../return_codes.json"
+
 func Test_ReadRegisterRequestBody(t *testing.T) {
 	assertCorrect := func(t *testing.T, got, want int) {
 		if got != want {
@@ -91,7 +93,7 @@ func Test_BytesToString(t *testing.T) {
 
 func Test_importReturnCodes(t *testing.T) {
 	t.Run("Attempting to run function with predefined file location", func(t *testing.T) {
-		got := importReturnCodes(codeListLocation)
+		got := importReturnCodes(sampleCodeListLocation)
 		if got != nil {
 			t.Errorf("Failed to get return codes, %v", got)
 		}
