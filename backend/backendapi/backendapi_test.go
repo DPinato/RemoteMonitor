@@ -1,6 +1,6 @@
 // runs the backend services required for a device to register, check-in and communicate with the central service
 
-package main
+package backendapi
 
 import (
 	"bytes"

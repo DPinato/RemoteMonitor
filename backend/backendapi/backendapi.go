@@ -1,6 +1,6 @@
 // runs the backend services required for a device to register, check-in and communicate with the central service
 
-package main
+package backendapi
 
 import (
 	"crypto/sha256"
@@ -15,14 +15,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Device is for maintaining devices currently being handled by this backend process
-type Device struct {
-	Name        string    `json:"name"`         // name a device identified itself with
-	Key         string    `json:"key"`          // key the device will use to authenticate itself with backend-api
-	Mac         string    `json:"mac"`          // MAC address of any interface provided by the device
-	LastCheckin time.Time `json:"last_checkin"` // time when the device last checked in
-}
-
 // ReturnCode is for responses to devices
 type ReturnCode struct {
 	Code       int    `json:"code"`
@@ -34,7 +26,7 @@ var deviceList []Device                  // cache for list of current devices
 var returnCodeList map[string]ReturnCode // store codes to return to clients
 var codeListLocation = "../return_codes.json"
 
-func main() {
+func SetupBackend() {
 
 	// import return codes from JSON file
 	returnCodeList = make(map[string]ReturnCode)
@@ -110,7 +102,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if device is already in the list
-	index := findDeviceByMac(deviceList, tmpDev)
+	index := FindDeviceByMac(deviceList, tmpDev)
 	if index != -1 {
 		log.Println(deviceList[index].Name + " (" + deviceList[index].Mac + ")" + " attempted to register again")
 		response, _ := generateErrorResponse("AlreadyRegistered")
@@ -140,7 +132,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	debug_dumpDeviceList(deviceList) // just for DEBUG
+	Debug_dumpDeviceList(deviceList) // just for DEBUG
 }
 
 func checkInDevice(w http.ResponseWriter, r *http.Request) {
@@ -174,7 +166,7 @@ func checkInDevice(w http.ResponseWriter, r *http.Request) {
 	responseMap["last_checkin"] = tmpDev.LastCheckin.String()
 	json.NewEncoder(w).Encode(responseMap)
 
-	debug_dumpDeviceList(deviceList) // just for DEBUG
+	Debug_dumpDeviceList(deviceList) // just for DEBUG
 
 }
 
@@ -212,7 +204,7 @@ func readCheckinRequestBody(body io.ReadCloser) (*Device, int) {
 	err = json.NewDecoder(body).Decode(&tmpDev)
 	if err == nil {
 		// check if a known key is found
-		index := findDeviceByKey(deviceList, *tmpDev)
+		index := FindDeviceByKey(deviceList, *tmpDev)
 		if index == -1 {
 			// not found
 			return nil, returnCodeList["BadKey"].Code
@@ -264,46 +256,6 @@ func generateErrorResponse(codeStr string) (string, error) {
 /////////////
 /////////////
 // generic helper functions
-func findDeviceByMac(list []Device, dev Device) int {
-	// find device dev in the list, check for matching MAC addresses
-	for i := 0; i < len(list); i++ {
-		if list[i].Mac == dev.Mac {
-			return i
-		}
-	}
-	return -1 // not in list
-}
-
-func findDeviceByKey(list []Device, dev Device) int {
-	// find device in list, check for matching key
-	for i := 0; i < len(list); i++ {
-		if list[i].Key == dev.Key {
-			return i
-		}
-	}
-	return -1 // not in list
-}
-
 func BytesToString(data [32]byte) string {
 	return fmt.Sprintf("%x", data)
-}
-
-/////////////
-/////////////
-// debug functions
-func debug_dumpDeviceList(list []Device, index ...int) {
-	// dump the contents of the deviceList slice
-	// if index is provided, only show the indexes
-	var jsonData []byte
-	if len(index) == 0 {
-		jsonData, _ = json.MarshalIndent(list, "", "    ")
-	} else {
-		var tmpList []Device
-		for i := 0; i < len(index); i++ {
-			tmpList = append(tmpList, list[index[i]])
-		}
-		jsonData, _ = json.MarshalIndent(tmpList, "", "    ")
-	}
-
-	log.Println(string(jsonData))
 }
