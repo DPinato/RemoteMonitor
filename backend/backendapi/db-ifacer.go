@@ -1,5 +1,5 @@
-// communicate with database
-// devices are registered in postgresql database
+// communicate with databases
+// Postgres is used to maintain information on currently registered devices, including their authentication key
 
 package backendapi
 
@@ -9,8 +9,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // used for postgres driver
 )
 
 func connectToPostgres(host, user, password, dbname string, port int) (*sql.DB, error) {
@@ -51,4 +52,27 @@ func readPostgresCredentialsFromFile(fileLoc string) (map[string]interface{}, er
 
 	return output, nil
 
+}
+
+func newDeviceRegister(dev Device, table string, dbObj *sql.DB) error {
+	// add device to postgres
+	now := time.Now()
+
+	sqlStatement := fmt.Sprintf("INSERT INTO %s ", table)
+	sqlStatement += `(key, name, os, mac, first_register_ts, last_register_ts, last_checkin_ts, last_checkout_ts)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	values := []interface{}{dev.Key,
+		dev.Name,
+		dev.OS,
+		dev.Mac,
+		now,
+		nil,
+		nil,
+		nil}
+	_, err := dbObj.Exec(sqlStatement, values...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

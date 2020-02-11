@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -36,6 +35,8 @@ type ReturnCode struct {
 
 var deviceList []Device                  // cache for list of current devices
 var returnCodeList map[string]ReturnCode // store codes to return to clients
+var dbObj *sql.DB                        // database object
+var pCreds map[string]interface{}        // store postgres-related info
 var codeListLocation = "../return_codes.json"
 var postgresCredFile = "postgres.json"
 
@@ -50,14 +51,13 @@ func SetupBackend() {
 	log.Printf("Loaded %d return codes\n", len(returnCodeList))
 
 	// get postgres credentials from file
-	pCreds, err := readPostgresCredentialsFromFile(postgresCredFile)
+	pCreds, err = readPostgresCredentialsFromFile(postgresCredFile)
 	if err != nil {
 		log.Printf("Failed to read Postgres credentials from %s\n", postgresCredFile)
 		log.Panic(err)
 	}
 
 	// connect to postgres
-	var dbObj *sql.DB
 	dbObj, err = connectToPostgres(pCreds["host"].(string),
 		pCreds["user"].(string),
 		pCreds["password"].(string),
@@ -69,15 +69,17 @@ func SetupBackend() {
 	defer dbObj.Close()
 	log.Printf("Successfully connected to Postgres at %s:%d\n", pgresHost, pgresPort)
 	log.Printf("Using database %s, table %s\n", pgresDBName, pgresTableName)
-	os.Exit(1)
 
 	// start HTTP server
 	router := mux.NewRouter()
-
 	router.HandleFunc("/register", registerDevice).Methods("POST")
 	router.HandleFunc("/checkin", checkInDevice).Methods("POST")
 
-	http.ListenAndServe(":8000", router)
+	err = http.ListenAndServe(":8000", router)
+	if err != nil {
+		log.Println("HTTP server terminated, PANIC")
+		log.Panic(err)
+	}
 }
 
 func importReturnCodes(fileLoc string) error {
@@ -160,6 +162,12 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		// err := json.NewEncoder(w).Encode(responseMap)
 		w.WriteHeader(200)
 		_, err = w.Write([]byte(resp))
+		if err != nil {
+			log.Println(err)
+		}
+
+		// update postgres
+		err = newDeviceRegister(tmpDev, pCreds["reg_table"].(string), dbObj)
 		if err != nil {
 			log.Println(err)
 		}
